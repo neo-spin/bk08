@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="./assets/img/velocityx-logo.svg">
+<title>Dino T-Rex Runner — Survival Arcade</title>
+<meta name="description" content="Dodge obstacles, jump high, and survive as long as possible in Dino T-Rex Runner.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css" />
+<style>
+  body { margin:0; background:#000000; color:#ffffff; font-family:'Inter',sans-serif; }
+  canvas { display:block; margin:60px auto; background:#e3b520; border:4px solid #639009; }
+  h1 { text-align:center; margin-top:20px; }
+  p { text-align:center; }
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="container nav-inner">
+    <a class="logo" href="index.html" aria-label="Home">  <span>Dino T-Rex Runner</span></a>
+    <div class="menu" data-nav-menu>
+      <a href="index.html" style='opacity:1;font-weight:800'>Home</a>
+      <a href="game.html">Play</a>
+      <a href="leaderboard.html">Scores</a>
+      <a href="about.html">About</a>
+      <a href="blog.html">Guides</a>
+      <a href="faq.html">FAQ</a>
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+    </div>
+    <div class="right"><a class="btn ghost" data-nav-toggle>Menu</a><a class="btn" href="game.html">Play Now</a></div>
+  </div>
+</nav>
+
+<h1>Dino T-Rex Runner — Desert Sprint</h1>
+<p>Jump over cacti and dodge birds to keep your T-Rex running. How high can you score?</p>
+<canvas id="pong" width="800" height="500"></canvas>
+
+<script>
+(function(){
+  const canvas = document.getElementById('pong');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  // Player Dino
+  const car = { x:60, y:H/2-20, w:40, h:50, dy:0, score:0 };
+  const trees = [];
+  let gameOver = false;
+  let frame = 0;
+
+  function drawCar(){
+    ctx.fillStyle = "#22c55e"; // Green Dino
+    ctx.fillRect(car.x, car.y, car.w, car.h);
+    // Eye
+    ctx.fillStyle="#111";
+    ctx.fillRect(car.x+25, car.y+10, 5, 5);
+  }
+
+  function addObstacle(){
+    const gap = 150;
+    const topHeight = Math.random() * (H - gap - 80) + 40;
+    trees.push({
+      x: W,
+      w: 40,
+      top: topHeight,
+      bottom: topHeight + gap
+    });
+  }
+
+  function update(){
+    car.y += car.dy;
+    if(car.y<0) car.y = 0;
+    if(car.y+car.h>H) car.y = H - car.h;
+
+    // Add trees periodically
+    frame++;
+    if(frame % 90 === 0) addObstacle();
+
+    // Move & check obstacles
+    for(let i=trees.length-1; i>=0; i--){
+      const tree = trees[i];
+      tree.x -= 4;
+
+      // Collision check
+      if(car.x + car.w > tree.x && car.x < tree.x + tree.w){
+        if(car.y < tree.top || car.y + car.h > tree.bottom){
+          gameOver = true;
+        }
+      }
+
+      // Passed tree
+      if(tree.x + tree.w < car.x && !tree.passed){
+        tree.passed = true;
+        car.score++;
+      }
+
+      // Remove off-screen
+      if(tree.x + tree.w < 0) trees.splice(i,1);
+    }
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = "#1b1f29";
+    ctx.fillRect(0,0,W,H);
+
+    // Draw trees
+    trees.forEach(tree=>{
+      // Top Obstacle (Bird)
+      ctx.fillStyle = "#ff4d4d";
+      ctx.fillRect(tree.x, 0, tree.w, tree.top);
+
+      // Bottom Obstacle (Cactus)
+      ctx.fillStyle = "#3B82F6"; 
+      ctx.fillRect(tree.x, tree.bottom, tree.w, H-tree.bottom);
+    });
+
+    // Draw Dino
+    drawCar();
+
+    // Score
+    ctx.fillStyle="#fff";
+    ctx.font="24px Inter";
+    ctx.fillText("Score: "+car.score, 20, 40);
+  }
+
+  function loop(){
+    if(!gameOver){
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    } else {
+      ctx.fillStyle="#fff";
+      ctx.font="32px Inter";
+      ctx.textAlign="center";
+      ctx.fillText("Game Over! Score: " + car.score, W/2, H/2 - 20);
+
+      // Save score to leaderboard
+      const key = 'vx_leaderboard';
+      const lb = JSON.parse(localStorage.getItem(key) || '[]');
+      lb.push({ score: car.score, at: Date.now() });
+      lb.sort((a, b) => b.score - a.score); // Sort descending
+      localStorage.setItem(key, JSON.stringify(lb.slice(0, 50)));
+
+      // Add a restart button
+      ctx.font = "20px Inter";
+      ctx.fillText("Press 'R' or click to Restart", W/2, H/2 + 30);
+    }
+  }
+  loop();
+
+  function restartGame() {
+    car.y = H/2 - 20;
+    car.score = 0;
+    trees.length = 0;
+    gameOver = false;
+    loop();
+  }
+
+  window.addEventListener('keydown', e=>{
+    if(e.key === "ArrowUp") car.dy = -6;
+    if(e.key === "ArrowDown") car.dy = 6;
+  });
+  window.addEventListener('keyup', e=>{
+    if(e.key === "ArrowUp" || e.key === "ArrowDown") car.dy = 0;
+    if(gameOver && (e.key === 'r' || e.key === 'R')) restartGame();
+  });
+  canvas.addEventListener('click', () => {
+    if(gameOver) {
+      restartGame();
+    }
+  });
+})();
+</script>
+</body>
+</html>
